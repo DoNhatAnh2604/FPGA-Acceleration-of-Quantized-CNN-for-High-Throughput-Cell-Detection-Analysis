@@ -28,6 +28,7 @@ Dự án này triển khai bộ tăng tốc phần cứng (Hardware Accelerator)
 ├── hdl/                 # Mã nguồn Verilog RTL điều khiển phần cứng hệ thống tầng đỉnh (`top.v`, `sys.v`)
 ├── simulation/          # Môi trường testbench kiểm thử dạng sóng tín hiệu (`test.v`, `input_data.mem`)
 └── constraints/         # File định nghĩa chân vật lý và cấu hình ràng buộc xung nhịp xung cho Vivado (.xdc)
+```
 ## 4. Hướng dẫn Triển khai & Chạy Dự án 
 
 Để chạy dự án từ bước thuật toán phần mềm xuống cấu trúc mạch số trên Kit **Zybo Z7**, thực hiện tuần tự theo 3 bước sau:
