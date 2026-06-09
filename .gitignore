@@ -1,0 +1,16 @@
+﻿# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Python compiled files
+__pycache__/
+*.pyc
+
+# Vivado / Xilinx simulation temporary files
+html/
+xsim.dir/
+*.log
+*.jou
+*.pb
+*.vcd
+.Xil/
