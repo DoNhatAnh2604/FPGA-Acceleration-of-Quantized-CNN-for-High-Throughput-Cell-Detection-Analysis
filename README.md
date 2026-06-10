@@ -1,7 +1,7 @@
 # FPGA Accelerator for High-Throughput Cell Detection
 
 <p align="center">
-<img src="https://digilent.com/reference/_media/programmable-logic/zybo-z7/zybo-z7-10-angled.png" width="650">
+<img src="[https://digilent.com/reference/_media/programmable-logic/zybo-z7/zybo-z7-10-angled.png](https://www.tequipment.net/Digilent/Zybo-Z7-20/FPGA/?srsltid=AfmBOopkJgkSX6gzNheVPY7cWc98KfBW8Rad8wWwCxhiLZcP9V9xQaT3)" width="650">
 </p>
 
 <p align="center">
