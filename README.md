@@ -1,125 +1,290 @@
 # FPGA Accelerator for High-Throughput Cell Detection
 
-Dự án này triển khai bộ tăng tốc phần cứng (Hardware Accelerator) trên Kit phát triển **Zybo Z7 (Sử dụng chip Xilinx Zynq-7000 xc7z010clg400-1)** nhằm mục đích phát hiện tế bào thời gian thực với thông lượng cao. Kiến trúc xử lý dựa trên mô hình mạng CNN lượng tử hóa 4-bit (được huấn luyện qua thư viện Brevitas) và biên dịch phần cứng tự động luồng dữ liệu thông qua AMD/Xilinx FINN Framework.
+<p align="center">
+<img width="700" src="https://digilent.com/reference/_media/programmable-logic/zybo-z7/zybo-z7-10-angled.png">
+</p>
 
-## 1. Thông số Hệ thống & Sơ đồ ngoại vi
-
-* **Tín hiệu đầu vào:** Chuỗi tín hiệu analog thô được lấy mẫu thông qua bộ ADC với tần số cố định **10 kHz**. Dữ liệu số hóa sau đó được đóng gói thành các chuỗi vector có độ dài cố định $L=20$ (tương đương với một cửa sổ thời gian xử lý là 2 ms) trước khi truyền đẩy trực tiếp vào trục giao tiếp AXI-Stream của lõi FINN.
-* **Tần số hoạt động phần cứng:** Toàn bộ lõi IP xử lý luồng dữ liệu được FINN sinh ra cấu hình chạy ở tần số ổn định **50 MHz**. Tần số này được hạ nguồn và đồng bộ pha thông qua khối Clocking Wizard (`clk_wiz_0`), lấy nguồn clock chính từ thạch anh hệ thống 125 MHz có sẵn trên board mạch Zybo Z7.
-* **Giao tiếp đầu ra:** Kết quả phân loại phát hiện tế bào (giá trị Logit) sau khi được lõi mạch tính toán xong sẽ được bộ điều khiển FSM đóng gói cấu trúc dữ liệu và truyền tải ngược về máy tính thông qua giao tiếp mã UART.
-
-### Cấu hình Chân vật lý (Pin Assignment)
-Định nghĩa chi tiết kết nối phần cứng vật lý trong file ràng buộc `constraints/con.xdc`:
-* `sysclk` (Xung nhịp hệ thống 125 MHz): Chân **K17**
-* `uart_tx` (Tín hiệu truyền UART xuất kết quả): Chân **V12** (Kết nối qua chân Pmod hoặc cổng UART-USB tùy thuộc cấu hình hệ thống mạch của bạn)
-
-## 2. Kiến trúc Tối ưu hóa Phần cứng (PE/SIMD)
-
-Để đảm bảo luồng dữ liệu truyền tải liên tục không bị thắt nút cổ chai (Bottleneck), các khối xử lý tính toán ma trận vector (MVAU) trong file đồ thị phần cứng `hardware_config/final_hw_config.json` được cấu hình phân tách tham số song song hóa như sau:
-* **MVAU_hls_0 (Tầng tích chập 1):** Cấu hình $PE = 1, SIMD = 4$ nhằm tiết kiệm diện tích logic.
-* **MVAU_hls_1 (Tầng tích chập 2):** Mở rộng song song $PE = 4, SIMD = 8$ để giải phóng nhanh khối lượng luồng dữ liệu dồi dào được đẩy ra liên tục từ tầng trước.
-
-## 3. Cấu trúc Thư mục Nguồn
-
-```text
-├── hardware_config/     # Tệp cấu hình phân bổ tham số phần cứng PE/SIMD (.json)
-├── notebooks/           # Mã nguồn Jupyter Notebook dùng để huấn luyện và tinh gọn đồ thị mô hình (.ipynb)
-├── models/              # Các file trung gian lưu trữ đồ thị mạng lượng tử hóa (.onnx)
-├── hdl/                 # Mã nguồn Verilog RTL điều khiển phần cứng hệ thống tầng đỉnh (`top.v`, `sys.v`)
-├── simulation/          # Môi trường testbench kiểm thử dạng sóng tín hiệu (`test.v`, `input_data.mem`)
-└── constraints/         # File định nghĩa chân vật lý và cấu hình ràng buộc xung nhịp xung cho Vivado (.xdc)
-```
-## 4. Hướng dẫn Triển khai & Chạy Dự án 
-
-Để chạy dự án từ bước thuật toán phần mềm xuống cấu trúc mạch số trên Kit **Zybo Z7**, thực hiện tuần tự theo 3 bước sau:
+<p align="center">
+Hardware Accelerator based on Zybo Z7-10 FPGA for real-time cell detection using a 4-bit quantized CNN compiled by AMD/Xilinx FINN Framework.
+</p>
 
 ---
 
-## Bước 1: Huấn luyện thuật toán và Xuất mô hình (Môi trường Python)
+# 1. Tổng quan hệ thống
 
-Mở terminal tại thư mục dự án và khởi động môi trường Jupyter Notebook:
+Dự án triển khai bộ tăng tốc phần cứng trên kit **Zybo Z7-10** sử dụng FPGA **Xilinx Zynq-7000 XC7Z010CLG400-1** nhằm thực hiện phân loại tín hiệu sinh học thời gian thực với thông lượng cao.
+
+Tín hiệu đầu vào được lấy mẫu bởi ADC với tần số cố định **10 kHz**, sau đó được đóng gói thành vector độ dài 20 mẫu và truyền trực tiếp vào bộ tăng tốc CNN được sinh tự động bởi FINN Framework.
+
+Kết quả phân loại được truyền ngược trở lại máy tính thông qua giao tiếp UART.
+
+---
+
+## Thông số hệ thống
+
+| Thông số                  | Giá trị         |
+| ------------------------- | --------------- |
+| Board FPGA                | Zybo Z7-10      |
+| FPGA Device               | XC7Z010CLG400-1 |
+| Clock hệ thống            | 125 MHz         |
+| Clock xử lý               | 50 MHz          |
+| Tần số lấy mẫu ADC        | 10 kHz          |
+| Kích thước vector đầu vào | 20 mẫu          |
+| Cửa sổ thời gian xử lý    | 2 ms            |
+| Giao tiếp đầu ra          | UART            |
+| Framework                 | AMD/Xilinx FINN |
+| Độ lượng tử hóa           | 4-bit           |
+
+---
+
+# 2. Kiến trúc phần cứng
+
+## Sơ đồ khối toàn hệ thống
+
+```text
+                  Analog Signal
+                        │
+                        ▼
+                ┌────────────────┐
+                │     ADC 10kHz  │
+                └────────────────┘
+                        │
+                        ▼
+                ┌────────────────┐
+                │ Sliding Window │
+                │      L = 20    │
+                └────────────────┘
+                        │
+                        ▼
+                ┌────────────────┐
+                │ AXI-Stream I/F │
+                └────────────────┘
+                        │
+                        ▼
+        ┌─────────────────────────────────┐
+        │        FINN CNN Accelerator     │
+        │                                 │
+        │ Conv1 → Conv2 → FC → Output     │
+        └─────────────────────────────────┘
+                        │
+                        ▼
+                ┌────────────────┐
+                │ FSM Controller │
+                └────────────────┘
+                        │
+                        ▼
+                ┌────────────────┐
+                │ UART TX Module │
+                └────────────────┘
+                        │
+                        ▼
+                     Computer
+```
+
+---
+
+## Kiến trúc bên trong FINN Accelerator
+
+```text
+Input Vector (20 samples)
+            │
+            ▼
+     Quantized Conv1
+            │
+            ▼
+        MaxPool
+            │
+            ▼
+     Quantized Conv2
+            │
+            ▼
+      Fully Connected
+            │
+            ▼
+         Logit Output
+```
+
+---
+
+## Kiến trúc Clock
+
+```text
+      125 MHz Crystal
+              │
+              ▼
+       ┌────────────┐
+       │ clk_wiz_0 │
+       └────────────┘
+              │
+              ▼
+            50 MHz
+              │
+              ▼
+      FINN Streaming IP
+```
+
+---
+
+## Song song hóa phần cứng
+
+### MVAU_hls_0
+
+```text
+PE = 1
+SIMD = 4
+```
+
+Tối ưu tài nguyên LUT và DSP.
+
+### MVAU_hls_1
+
+```text
+PE = 4
+SIMD = 8
+```
+
+Tăng thông lượng dữ liệu và giảm bottleneck giữa các tầng.
+
+---
+
+## Pin Assignment
+
+Được định nghĩa trong:
+
+```text
+constraints/con.xdc
+```
+
+| Tín hiệu | Chân FPGA |
+| -------- | --------- |
+| sysclk   | K17       |
+| uart_tx  | V12       |
+
+---
+
+# 3. Cấu trúc thư mục dự án
+
+```text
+.
+├── hardware_config/
+│   └── final_hw_config.json
+│
+├── notebooks/
+│   ├── 2dconv.ipynb
+│   ├── transform.ipynb
+│   └── validate.ipynb
+│
+├── models/
+│   └── quant_cnn_4bit.onnx
+│
+├── hdl/
+│   ├── top.v
+│   ├── sys.v
+│   ├── adc_top.v
+│   ├── finn_uart_backend.v
+│   └── uart_tx.v
+│
+├── simulation/
+│   ├── test.v
+│   └── input_data.mem
+│
+└── constraints/
+    └── con.xdc
+```
+
+---
+
+# 4. Hướng dẫn triển khai
+
+## Bước 1: Huấn luyện mạng CNN
+
+Mở terminal:
 
 ```bash
 jupyter notebook notebooks/2dconv.ipynb
 ```
 
-Chạy toàn bộ notebook này để tiến hành:
+Chạy lần lượt:
 
-- Huấn luyện mạng chập (CNN).
-- Lượng tử hóa trọng số.
-- Xuất file đồ thị mạng chuẩn ONNX:
+* 2dconv.ipynb
+* transform.ipynb
+* validate.ipynb
+
+Sau khi hoàn tất sẽ sinh ra:
 
 ```text
 models/quant_cnn_4bit.onnx
 ```
 
-Tiếp tục chạy các notebook:
-
-```text
-transform.ipynb
-validate.ipynb
-```
-
-để tối ưu cấu trúc đồ thị luồng dữ liệu.
-
 ---
 
-## Bước 2: Biên dịch khối IP tăng tốc phần cứng bằng FINN
+## Bước 2: Biên dịch phần cứng bằng FINN
 
-Khởi động Docker Container của **FINN Framework** trên máy tính của bạn và trỏ đường dẫn đến file cấu hình phần cứng:
+Khởi động Docker của FINN Framework.
+
+Sử dụng file:
 
 ```text
 hardware_config/final_hw_config.json
 ```
 
-FINN sẽ tự động thực hiện quá trình **High-Level Synthesis (HLS)** để đóng gói thuật toán mạng CNN thành khối IP lõi phần cứng RTL tương thích giao tiếp **AXI-Stream**.
+FINN sẽ tự động:
+
+* Tối ưu đồ thị mạng
+* Sinh kiến trúc streaming
+* Thực hiện HLS
+* Đóng gói IP hỗ trợ AXI-Stream
 
 ---
 
-## Bước 3: Mô phỏng vi mạch và Nạp code phần cứng (Xilinx Vivado)
+## Bước 3: Tạo project Vivado
 
-Mở phần mềm **Xilinx Vivado** và tạo một dự án mới (**New Project**).
+Mở:
 
-Tại bảng chọn chip mục tiêu, chọn đúng mã chip của Kit Zybo Z7-10:
+```text
+Vivado → Create Project
+```
+
+Chọn FPGA:
 
 ```text
 xc7z010clg400-1
 ```
 
-Tiến hành thêm các file mã nguồn tương ứng trong thư mục dự án:
+---
 
 ### Design Sources
 
-Thêm toàn bộ các file trong thư mục:
+Thêm toàn bộ file trong:
 
 ```text
 hdl/
 ```
 
-vào nhóm **Design Sources**.
+---
 
 ### Constraints
 
-Thêm các file trong thư mục:
+Thêm file:
 
 ```text
-constraints/
+constraints/con.xdc
 ```
 
-vào nhóm **Constraints**.
+---
 
 ### Simulation Sources
 
-Thêm các file:
+Thêm:
 
 ```text
 simulation/test.v
 simulation/input_data.mem
 ```
 
-vào nhóm **Simulation Sources**.
+---
 
-### Chạy mô phỏng
+## Bước 4: Chạy mô phỏng
 
 Chọn:
 
@@ -127,40 +292,57 @@ Chọn:
 Run Simulation
 ```
 
-để thực hiện mô phỏng dạng sóng.
-
-Kiểm tra hoạt động bắt tay truyền nhận tín hiệu:
+Kiểm tra quá trình bắt tay AXI-Stream:
 
 ```text
-tvalid / tready
+tvalid
+tready
 ```
 
-theo chuẩn **AXI-Stream** giữa máy trạng thái FSM điều khiển và lõi IP FINN.
+---
 
-### Sinh bitstream
+## Bước 5: Generate Bitstream
 
-Sau khi dạng sóng mô phỏng hoạt động chính xác, chọn:
+Chọn:
 
 ```text
 Generate Bitstream
 ```
 
-để Vivado thực hiện:
+Vivado sẽ thực hiện:
 
-- Tổng hợp mạch (Synthesis).
-- Định tuyến chân (Implementation).
-- Sinh file nhị phân cấu hình FPGA:
+* Synthesis
+* Implementation
+* Bitstream Generation
+
+Kết quả thu được:
 
 ```text
 .bit
 ```
 
-### Nạp xuống Kit Zybo Z7
+---
 
-Kết nối Kit Zybo Z7 với máy tính qua cáp USB, mở:
+## Bước 6: Nạp xuống FPGA
+
+Kết nối Zybo Z7 với máy tính qua cáp USB.
+
+Mở:
 
 ```text
 Hardware Manager
 ```
 
-và tiến hành nạp file bitstream xuống FPGA để hệ thống bắt đầu hoạt động thực tế.
+Sau đó:
+
+```text
+Open Target
+↓
+Auto Connect
+↓
+Program Device
+```
+
+Nạp file `.bit` xuống FPGA.
+
+Sau khi nạp thành công, bộ tăng tốc CNN sẽ hoạt động ở 50 MHz và kết quả phân loại được truyền trở lại máy tính thông qua UART.
