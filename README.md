@@ -1,9 +1,5 @@
 # FPGA Accelerator for High-Throughput Cell Detection
 
-<p align="center">
-<img src="![Uploading image.png…]()
-" width="650">
-</p>
 
 <p align="center">
 Hardware Accelerator based on Zybo Z7-10 FPGA for real-time cell detection using a 4-bit quantized CNN compiled by AMD/Xilinx FINN Framework.
